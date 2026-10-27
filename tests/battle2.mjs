@@ -1,0 +1,33 @@
+import { launch, advance, shot } from './lib.mjs';
+const out = process.argv[2] || '/tmp/claude-0/shots';
+const fs = await import('node:fs'); fs.mkdirSync(out, { recursive: true });
+const mission = Number(process.env.MISSION || 2);
+const T = await launch({ port: 8772 });
+const { page, errors } = T;
+await page.click('#play');
+await page.evaluate((m) => { const D = window.__duck; D.stop(); D.ctx.save.campaign = D.newCampaign(); D.ctx.save.campaign.unlocked = 12; D.app.startMission(D.MISSIONS[m - 1]); }, mission);
+// let the fade + world build happen
+await advance(page, 4, 1 / 20, false);
+console.log(await page.evaluate(() => { const D = window.__duck, b = D.battle; return JSON.stringify({ state: D.state, phase: b?.phase, team: b?.team?.name, active: b?.active?.name, fade: D.player.fadeV, ducks: b?.ducks.map(d => `${d.name} ${d.pos.x.toFixed(1)},${d.pos.y.toFixed(2)},${d.pos.z.toFixed(1)} ${d.state}`) }); }));
+await shot(page, `${out}/c1-start.png`);
+await page.evaluate(() => { const D = window.__duck, b = D.battle, me = D.player.duck; const e = b.ducks.find(d => d.team !== me.team) || b.ducks[1]; D.player.yaw = Math.atan2(e.pos.x - me.pos.x, e.pos.z - me.pos.z); D.player.pitch = 0.0; });
+await advance(page, 0.1);
+await shot(page, `${out}/c2-look-enemy.png`);
+const info = await page.evaluate(() => { const r = window.__duck.renderer.info.render; return { calls: r.calls, tris: r.triangles }; });
+console.log('render', JSON.stringify(info));
+// charge + fire via the player controller using simulated mouse buttons
+await page.evaluate(() => { const D = window.__duck; D.input.mouse.locked = true; D.player.pitch = 0.35; D.input.mouse.buttons[0] = true; });
+await advance(page, 0.9, 1 / 30, false);
+await shot(page, `${out}/c3-charging.png`);
+await page.evaluate(() => { const D = window.__duck; D.input.mouse.buttons[0] = false; });
+await advance(page, 0.6);
+await shot(page, `${out}/c4-flight.png`);
+await advance(page, 2.5);
+await shot(page, `${out}/c5-impact.png`);
+console.log(await page.evaluate(() => { const b = window.__duck.battle; return JSON.stringify({ phase: b.phase, fired: b.fired, proj: b.projectiles.length, hp: b.ducks.map(d => Math.round(d.hp)) }); }));
+await advance(page, 4, 1 / 30, false);
+await shot(page, `${out}/c6-enemy-turn.png`);
+console.log(await page.evaluate(() => { const b = window.__duck.battle; return JSON.stringify({ phase: b.phase, team: b.team?.name, ai: !!b.ai, aiState: b.ai?.state }); }));
+fs.writeFileSync(`${out}/errors.txt`, errors.join('\n'));
+console.log('ERRORS', errors.length); console.log(errors.slice(0, 20).join('\n'));
+await T.close();

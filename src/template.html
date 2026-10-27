@@ -1,0 +1,98 @@
+<title>Duck &amp; Cover</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Turn-based artillery from a duck's-eye view. Play in VR on Meta Quest or with mouse and keyboard.">
+<!--__HEAD__-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;600&family=Share+Tech+Mono&family=Stardos+Stencil:wght@400;700&display=swap">
+<style>
+  /* Layout: full-bleed 3D stage with a field-manual card docked bottom-left. */
+  :root {
+    --ink: #0f1815;            /* pond-bottom green-black */
+    --card: rgba(13, 21, 18, 0.88);
+    --paper: #efe7cf;          /* khaki field-manual paper */
+    --dim: rgba(239, 231, 207, 0.66);
+    --rule: rgba(239, 231, 207, 0.18);
+    --bill: #f2c230;           /* duck-bill signal yellow */
+    --bill-ink: #1a1406;
+    --mallard: #2f7d55;
+    --danger: #ef7a5f;
+    --f-display: "Stardos Stencil", "Arial Black", Impact, sans-serif;
+    --f-body: "Barlow Semi Condensed", "Arial Narrow", Arial, sans-serif;
+    --f-mono: "Share Tech Mono", Consolas, monospace;
+    color-scheme: dark;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--ink); color: var(--paper); font-family: var(--f-body); font-size: 17px; overflow: hidden; }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  #landing {
+    position: fixed; inset: 0; z-index: 10;
+    display: flex; flex-direction: column; align-items: flex-start;
+    padding-block: max(28px, env(safe-area-inset-top, 0px)) max(28px, env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background: linear-gradient(180deg, rgba(15,24,21,0) 0%, rgba(15,24,21,0.25) 45%, rgba(15,24,21,0.82) 100%);
+    overflow-y: auto;
+  }
+  .card {
+    margin-top: auto;
+    width: min(560px, 100%); box-sizing: border-box;
+    background: var(--card); border: 2px solid var(--bill); border-radius: 18px;
+    padding: 28px 30px 24px;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    display: grid; gap: 18px;
+  }
+  .eyebrow { font-family: var(--f-mono); font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--dim); margin: 0; }
+  h1 { font-family: var(--f-display); font-weight: 700; color: var(--bill); font-size: clamp(46px, 9vw, 76px); line-height: 0.92; margin: 0; letter-spacing: 0.01em; text-wrap: balance; }
+  .tag { font-size: 19px; line-height: 1.4; margin: 0; max-width: 46ch; }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  button {
+    font-family: var(--f-body); font-weight: 600; font-size: 19px; letter-spacing: 0.02em;
+    padding: 14px 22px; border-radius: 12px; cursor: pointer; min-height: 52px;
+    border: 2px solid var(--bill); background: transparent; color: var(--paper);
+    transition: background 120ms ease, color 120ms ease, transform 120ms ease;
+  }
+  button.primary { background: var(--bill); color: var(--bill-ink); }
+  button:hover:not(:disabled) { background: #ffd955; color: var(--bill-ink); border-color: #ffd955; }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:focus-visible { outline: 3px solid var(--paper); outline-offset: 3px; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  #vr-note { margin: 0; color: var(--dim); font-size: 16px; line-height: 1.4; }
+  #vr-note[data-state="error"] { color: var(--danger); }
+  .notes { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; padding-top: 14px; border-top: 1px solid var(--rule); font-size: 15px; }
+  .notes dt { font-family: var(--f-mono); color: var(--bill); font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; padding-top: 2px; }
+  .notes dd { margin: 0; color: var(--dim); min-width: 0; }
+  #device { font-family: var(--f-mono); font-size: 13px; color: var(--dim); margin: 0; }
+  #fps { position: fixed; top: max(8px, env(safe-area-inset-top, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); z-index: 5; font-family: var(--f-mono); font-size: 13px; color: var(--paper); background: rgba(13,21,18,0.7); padding: 4px 8px; border-radius: 6px; }
+  #boot { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: var(--ink); font-family: var(--f-mono); color: var(--dim); letter-spacing: 0.2em; text-transform: uppercase; font-size: 13px; }
+  @media (max-width: 480px) {
+    .card { padding: 22px 18px 18px; }
+    .actions button { flex: 1 1 100%; }
+    .notes { grid-template-columns: 1fr; gap: 2px; }
+    .notes dd { margin-bottom: 8px; }
+  }
+  @media (prefers-reduced-motion: reduce) { button { transition: none; } }
+</style>
+<div id="stage"></div>
+<div id="boot">Digging trenches…</div>
+<div id="fps" hidden></div>
+<main id="landing">
+  <section class="card" aria-labelledby="t">
+    <p class="eyebrow">Mallard Fusiliers · 12-mission campaign</p>
+    <h1 id="t">Duck &amp; Cover</h1>
+    <p class="tag">Turn-based artillery seen through your duck’s eyes. In VR you wear your duck: its arms follow your hands and its webbed feet step with you. Lob mortars over marsh, snow and canyon, and knock the enemy into the river.</p>
+    <div class="actions">
+      <button id="enter-vr" class="primary" disabled>Enter VR</button>
+      <button id="play">Play on this screen</button>
+    </div>
+    <p id="vr-note">Checking for a VR headset…</p>
+    <dl class="notes">
+      <dt>Quest</dt><dd>Open this game’s web address in the Meta Quest Browser, then press Enter VR.</dd>
+      <dt>Screen</dt><dd>Mouse to look and aim, hold the left button to charge, W A S D to walk.</dd>
+    </dl>
+    <p id="device"></p>
+  </section>
+</main>
+<!--__SCRIPTS__-->
